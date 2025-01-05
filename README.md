@@ -73,7 +73,7 @@ TOKEN = "your-telegram-bot-token"
 
 ---
 
-## Running the Project
+### 8. Running the Project
 1. Open a terminal in the directory containing the source file.
 2. Run the command:
 `python TelegramBotControlComputer.py`
@@ -81,7 +81,7 @@ TOKEN = "your-telegram-bot-token"
 
 ---
 
-## Packaging the Project with PyInstaller
+### 9. Packaging the Project with PyInstaller
 1. Install PyInstaller:
 `pip install pyinstaller`
 2. Package the source file into a standalone `.exe` file:
