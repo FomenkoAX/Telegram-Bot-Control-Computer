@@ -7,10 +7,11 @@ nest_asyncio.apply()
 from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from pynput.mouse import Controller, Button
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
-from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
+from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand, KeyboardButton
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, CallbackQueryHandler, filters
 
 # Đường dẫn lưu file tải về
@@ -23,34 +24,40 @@ if not os.path.exists(UPLOAD_FOLDER):
 COMMANDS = {
     "/introduce": "Giới thiệu về tôi.",
     "/shutdown": "Lệnh tắt máy.",
+    "/sleep": "Lệnh vào chế độ ngủ.",
     "/restart": "Lệnh khởi động máy.",
-    "/cancel": "Lệnh hủy toàn bộ các lệnh.",
-    "/screenshot": "Lệnh chụp ảnh màn hình và gửi về máy.",
-    "/uploadfile": "Yêu cầu người dùng gửi file để tải lên.",
-    "/downloadfile": "Yêu cầu người dùng gửi file để tải về.",
-    "/tasklist": "Hiển thị danh sách các tiến trình đang chạy.",
-    "/systeminfo": "Hiển thị thông tin hệ thống.",
-    "/ipconfig": "Hiển thị thông tin cấu hình mạng.",
+    "/cancel": "Huỷ toàn bộ các lệnh.",
+
+    "/screenshot": "Chụp ảnh màn hình và gửi về máy.",
+    "/uploadfile": "Người dùng gửi file để tải lên máy.",
+    "/downloadfile": "Người dùng nhập đường dẫn để tải về.",
+    "/tasklist": "Danh sách các tiến trình đang chạy.",
+    "/systeminfo": "Thông tin hệ thống.",
+    "/ipconfig": "Thông tin cấu hình mạng.",
     "/release": "Giải phóng địa chỉ IP hiện tại.",
     "/renew": "Gia hạn địa chỉ IP mới.",
-    "/netuser": "Hiển thị danh sách người dùng trên máy tính.",
-    "/whoami": "Hiển thị tên tài khoản đang đăng nhập.",
+    "/netuser": "Danh sách người dùng trên máy tính.",
+    "/whoami": "Tên tài khoản đang đăng nhập.",
     "/hostname": "Hiển thị tên máy tính.",
+
     "/menu": "Hiển thị danh sách các lệnh.",
     "/playvideo": "Phát video YouTube từ link.",
-    "/customvolume": "Điều chỉnh âm lượng."
+    "/customvolume": "Điều chỉnh âm lượng.",
+    "/controlmouse": "Điều khiển chuột ảo.",
+    "/keyboardemulator": "Điều khiển bàn phím ảo.",
+    "/deletefile": "Người dùng nhập đường dẫn để xoá file.",
+    "/openweb": "Mở các trang web từ lệnh.",
 }
 
 # Selenium setup
-# Selenium setup
-CHROME_DRIVER_PATH = "<Enter the path to ChromeDriver (chromedriver.exe)>"
-BRAVE_PATH = "<Enter the path to Brave Browser (brave.exe)>"
+CHROME_DRIVER_PATH = "ENTER YOUR PATH TO CHROMEDRIVER.EXE"
+BRAVE_PATH = "ENTER YOUR PATH TO BRAVE.EXE"
 
 options = Options()
 options.binary_location = BRAVE_PATH
 
 # Thêm đường dẫn đến hồ sơ trình duyệt của bạn
-USER_DATA_DIR = "<Enter the path to the Brave User Data folder>"
+USER_DATA_DIR = "ENTER YOUR PATH TO BRAVE USER DATA"
 options.add_argument(f"--user-data-dir={USER_DATA_DIR}")
 
 options.add_argument("--start-maximized")
@@ -60,7 +67,7 @@ driver = None
 
 async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     basic_commands = "\n".join([
-        f"🔻 {command} ➡️ {desc}" for command, desc in COMMANDS.items()
+        f"🔻 {command}➡️ {desc}" for command, desc in COMMANDS.items()
     ])
     await update.message.reply_text(f"Danh sách các lệnh:\n{basic_commands}")
 
@@ -113,8 +120,7 @@ async def play_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("⏯ Phát / Tạm dừng", callback_data="play_pause"),
          InlineKeyboardButton("⏪ Tua lại 10s", callback_data="rewind")],
         [InlineKeyboardButton("⏩ Tua tới 10s", callback_data="forward"),
-         InlineKeyboardButton("🔄 Chuyển video", callback_data="change_video")],
-        [InlineKeyboardButton("❌ Đóng toàn bộ", callback_data="close_all")]
+        InlineKeyboardButton("❌ Đóng toàn bộ", callback_data="close_all")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("Chọn hành động:", reply_markup=reply_markup)
@@ -152,9 +158,6 @@ async def video_controls(update: Update, context: ContextTypes.DEFAULT_TYPE):
         driver.execute_script("document.querySelector('video').currentTime += 10;")
         await query.edit_message_text("Đã tua tới 10 giây.")
 
-    elif action == "change_video":
-        await query.edit_message_text("Gửi link YouTube mới kèm lệnh /playvideo [link] để phát.")
-
     elif action == "close_all":
         try:
             if driver:
@@ -162,7 +165,7 @@ async def video_controls(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 driver = None  # Đặt lại biến `driver` về None
 
             # Tắt toàn bộ trình duyệt Brave
-            os.system("taskkill /F /IM brave.exe")  # Dùng os.system để đảm bảo lệnh được thực thi
+            os.system("taskkill /F /IM brave.exe")
             await query.edit_message_text("Đã đóng toàn bộ trình duyệt Brave.")
         except Exception as e:
             await query.edit_message_text(f"Có lỗi xảy ra khi tắt Brave: {e}")
@@ -173,8 +176,7 @@ async def video_controls(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("⏯ Phát / Tạm dừng", callback_data="play_pause"),
              InlineKeyboardButton("⏪ Tua lại 10s", callback_data="rewind")],
             [InlineKeyboardButton("⏩ Tua tới 10s", callback_data="forward"),
-             InlineKeyboardButton("🔄 Chuyển video", callback_data="change_video")],
-            [InlineKeyboardButton("❌ Đóng trình duyệt", callback_data="close_all")]
+            InlineKeyboardButton("❌ Đóng trình duyệt", callback_data="close_all")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_reply_markup(reply_markup=reply_markup)
@@ -198,10 +200,10 @@ async def handle_volume_control(update: Update, context: ContextTypes.DEFAULT_TY
     action = query.data
     try:
         if action == "decrease_volume":
-            os.system("<Enter the path to nircmdc.exe> changesysvolume -3277")  # Giảm âm lượng
+            os.system("ENTER YOUR PATH TO NIRCMDC.EXE changesysvolume -3277")  # Giảm âm lượng
             await query.edit_message_text("Đã giảm âm lượng.")
         elif action == "increase_volume":
-            os.system("<Enter the path to nircmdc.exe> changesysvolume 3277")  # Tăng âm lượng
+            os.system("ENTER YOUR PATH TO NIRCMDC.EXE changesysvolume 3277")  # Tăng âm lượng
             await query.edit_message_text("Đã tăng âm lượng.")
     except Exception as e:
         await query.edit_message_text(f"Có lỗi xảy ra: {e}")
@@ -224,80 +226,210 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Các nhóm lệnh khác
     system_commands = "\n".join([
         f"🔻 {command} ➡️ {desc}" for command, desc in COMMANDS.items() if command in [
-            "/shutdown", "/restart", "/cancel", "/screenshot"
+            "/shutdown", "/sleep", "/restart", "/cancel"
+        ]
+    ])
+    image_commands = "\n".join([
+        f"🔻 {command} ➡️ {desc}" for command, desc in COMMANDS.items() if command in [
+            "/screenshot"
         ]
     ])
     file_io_commands = "\n".join([
         f"🔻 {command} ➡️ {desc}" for command, desc in COMMANDS.items() if command in [
-            "/uploadfile", "/downloadfile"
+            "/uploadfile", "/downloadfile", "/deletefile"
         ]
     ])
     system_info_commands = "\n".join([
         f"🔻 {command} ➡️ {desc}" for command, desc in COMMANDS.items() if command in [
-            "/tasklist", "/systeminfo", "/ipconfig", "/release", "/renew",
-            "/netuser", "/whoami", "/hostname"
+            "/tasklist", "/systeminfo", "/netuser", "/whoami", "/hostname"
+        ]
+    ])
+    network_commands = "\n".join([
+        f"🔻 {command} ➡️ {desc}" for command, desc in COMMANDS.items() if command in [
+            "/ipconfig", "/release", "/renew"
+        ]
+    ])
+    entertainment_commands = "\n".join([
+        f"🔻 {command} ➡️ {desc}" for command, desc in COMMANDS.items() if command in [
+            "/menu", "/playvideo", "/openweb"
         ]
     ])
     utility_commands = "\n".join([
         f"🔻 {command} ➡️ {desc}" for command, desc in COMMANDS.items() if command in [
-            "/menu", "/playvideo"
+            "/customvolume", "/controlmouse", "/keyboardemulator"
         ]
     ])
 
-    # Nội dung đầy đủ menu
+    # Nội dung menu đầy đủ
     menu_text = (
         f"DANH SÁCH CÁC LỆNH\n"
         f"📌 Author: LePhiAnhDev\n\n"
-        f"{introduce_command}\n\n"
-        f"⚡️ HỆ THỐNG LỆNH:\n"
-        f"{system_commands}\n\n"
-        f"⚡️ I/O FILE:\n"
-        f"{file_io_commands}\n\n"
-        f"⚡️ LỆNH HỆ THỐNG:\n"
-        f"{system_info_commands}\n\n"
-        f"⚡️ LỆNH TIỆN ÍCH:\n"
-        f"{utility_commands}"
+        f"⚡️ GIỚI THIỆU\n{introduce_command}\n\n"
+        f"⚡️ HỆ THỐNG LỆNH:\n{system_commands}\n\n"
+        f"⚡️ LỆNH HÌNH ẢNH:\n{image_commands}\n\n"
+        f"⚡️ I/O FILE:\n{file_io_commands}\n\n"
+        f"⚡️ LỆNH THÔNG TIN MÁY:\n{system_info_commands}\n\n"
+        f"⚡️ LỆNH HỆ THỐNG:\n{network_commands}\n\n"
+        f"⚡️ LỆNH GIẢI TRÍ:\n{entertainment_commands}\n\n"
+        f"⚡️ LỆNH TIỆN ÍCH:\n{utility_commands}"
     )
 
     await update.message.reply_text(menu_text)
 
-# Chạy lệnh terminal và trả về kết quả
-async def run_command(update: Update, context: ContextTypes.DEFAULT_TYPE, command: str):
+# Các lệnh mới
+# Tạo đối tượng điều khiển chuột
+
+mouse = Controller()
+# Hàm xử lý di chuyển và click chuột
+async def handle_mouse_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    action = query.data
+
+    # Điều khiển chuột
+    if action == "up":
+        mouse.move(0, -30)  # Lên
+    elif action == "down":
+        mouse.move(0, 30)  # Xuống
+    elif action == "left":
+        mouse.move(-30, 0)  # Trái
+    elif action == "right":
+        mouse.move(30, 0)  # Phải
+    elif action == "left_click":
+        mouse.click(Button.left, 1)  # Click chuột trái
+    elif action == "right_click":
+        mouse.click(Button.right, 1)  # Click chuột phải
+
+    # Tạo bàn phím với các nút điều khiển
+    keyboard = [
+        [
+            InlineKeyboardButton("⬆️ Lên", callback_data="up")
+        ],
+        [
+            InlineKeyboardButton("⬅️ Trái", callback_data="left"),
+            InlineKeyboardButton("➡️ Phải", callback_data="right")
+        ],
+        [
+            InlineKeyboardButton("⬇️ Xuống", callback_data="down")
+        ],
+        [
+            InlineKeyboardButton("🖱️ Click trái", callback_data="left_click"),
+            InlineKeyboardButton("🖱️ Click phải", callback_data="right_click")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    # Cập nhật tin nhắn với các nút mới
+    await query.edit_message_text(
+        text=f"Đã thực hiện thao tác: {action}\nChọn thao tác điều khiển chuột:",
+        reply_markup=reply_markup
+    )
+
+# Lệnh /controlmouse
+async def control_mouse(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Tạo bàn phím với các nút điều khiển
+    keyboard = [
+        [
+            InlineKeyboardButton("⬆️ Lên", callback_data="up")
+        ],
+        [
+            InlineKeyboardButton("⬅️ Trái", callback_data="left"),
+            InlineKeyboardButton("➡️ Phải", callback_data="right")
+        ],
+        [
+            InlineKeyboardButton("⬇️ Xuống", callback_data="down")
+        ],
+        [
+            InlineKeyboardButton("🖱️ Click trái", callback_data="left_click"),
+            InlineKeyboardButton("🖱️ Click phải", callback_data="right_click")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    # Gửi bàn phím đến người dùng
+    await update.message.reply_text("Chọn thao tác điều khiển chuột:", reply_markup=reply_markup)
+
+# Hàm hiển thị bàn phím mô phỏng
+async def keyboard_emulator(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # Tạo bàn phím với các phím từ a đến z, dấu cách, backspace, và enter
+    keyboard = [
+        [KeyboardButton('a'), KeyboardButton('b'), KeyboardButton('c'), KeyboardButton('d'), KeyboardButton('e'),
+         KeyboardButton('f'), KeyboardButton('g'), KeyboardButton('h'), KeyboardButton('i'), KeyboardButton('j')],
+        [KeyboardButton('k'), KeyboardButton('l'), KeyboardButton('m'), KeyboardButton('n'), KeyboardButton('o'),
+         KeyboardButton('p'), KeyboardButton('q'), KeyboardButton('r'), KeyboardButton('s'), KeyboardButton('t')],
+        [KeyboardButton('u'), KeyboardButton('v'), KeyboardButton('w'), KeyboardButton('x'), KeyboardButton('y'),
+         KeyboardButton('z')],
+        [KeyboardButton('space'), KeyboardButton('Backspace'), KeyboardButton('Enter')]  # Dấu cách, backspace, enter
+    ]
+
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
+    await update.message.reply_text(
+        "Đây là bàn phím mô phỏng của bạn.",
+        reply_markup=reply_markup
+    )
+
+# Xử lý khi người dùng nhấn phím
+async def handle_key_press(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_input = update.message.text  # Lấy nội dung từ phím bấm
+
+    # Mô phỏng nhấn phím với pyautogui
+    if user_input == 'Backspace':
+        pyautogui.press('backspace')  # Mô phỏng nhấn phím Backspace
+    elif user_input == 'Enter':
+        pyautogui.press('enter')  # Mô phỏng nhấn phím Enter
+    elif user_input == 'space':
+        pyautogui.press('space')  # Mô phỏng nhấn phím Space
+    else:
+        pyautogui.typewrite(user_input)  # Mô phỏng nhấn các phím chữ thường
+
+# Ghi kết quả vào file và gửi file
+async def run_command_to_file(update: Update, context: ContextTypes.DEFAULT_TYPE, command: str, file_name: str):
     try:
         result = os.popen(command).read()
-        if not result.strip():  # Kiểm tra nếu kết quả rỗng
-            result = "Không có dữ liệu để hiển thị hoặc lệnh không hợp lệ."
-        await update.message.reply_text(
-            f"Kết quả:\n```\n{result}\n```",
-            parse_mode="Markdown"
-        )
-    except Exception as e:
-        await update.message.reply_text(f"Có lỗi xảy ra khi chạy lệnh: {e}")
+        file_path = os.path.join(UPLOAD_FOLDER, file_name)
 
-# Các lệnh mới
+        # Ghi kết quả vào file
+        with open(file_path, 'w', encoding='utf-8') as file:
+            file.write(result if result.strip() else "Không có dữ liệu để hiển thị hoặc lệnh không hợp lệ.")
+
+        # Gửi file qua Telegram
+        with open(file_path, 'rb') as file:
+            await context.bot.send_document(chat_id=update.effective_chat.id, document=file)
+
+        # Xóa file sau khi gửi
+        os.remove(file_path)
+    except Exception as e:
+        await update.message.reply_text(f"Có lỗi xảy ra: {e}")
+
+# Cập nhật các lệnh mới
 async def tasklist(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await run_command(update, context, "tasklist")
+    await run_command_to_file(update, context, "tasklist", "tasklist_output.txt")
 
 async def systeminfo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await run_command(update, context, "systeminfo")
+    await run_command_to_file(update, context, "systeminfo", "systeminfo_output.txt")
 
 async def ipconfig(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await run_command(update, context, "ipconfig")
+    await run_command_to_file(update, context, "ipconfig", "ipconfig_output.txt")
 
 async def release(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await run_command(update, context, "ipconfig /release")
+    await run_command_to_file(update, context, "ipconfig /renew", "renew_output.txt")
 
 async def renew(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await run_command(update, context, "ipconfig /renew")
+    await run_command_to_file(update, context, "ipconfig /renew", "renew_output.txt")
 
 async def netuser(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await run_command(update, context, "net user")
+    await run_command_to_file(update, context, "net user", "netuser_output.txt")
 
 async def whoami(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await run_command(update, context, "whoami")
+    await run_command_to_file(update, context, "whoami", "whoami_output.txt")
 
 async def hostname(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await run_command(update, context, "hostname")
+    await run_command_to_file(update, context, "hostname", "hostname_output.txt")
+
+# Lệnh sleep
+async def sleep(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await ask_confirmation(update, context, "sleep")
 
 # Tạo inline button để xác nhận
 async def confirm_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -314,6 +446,13 @@ async def confirm_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif action == "cancel":
         os.system("shutdown -a")
         await query.edit_message_text("Đã hủy toàn bộ lệnh.")
+    elif action == "sleep":
+        try:
+            await query.edit_message_text("Máy tính sẽ vào chế độ ngủ ngay bây giờ.")
+            time.sleep(2)  # Đợi 2 giây để đảm bảo tin nhắn được gửi
+            os.system("rundll32.exe powrprof.dll,SetSuspendState 0,1,0")
+        except Exception as e:
+            await query.edit_message_text(f"Có lỗi xảy ra khi thực hiện lệnh sleep: {e}")
     else:
         await query.edit_message_text("Không có hành động được thực hiện.")
 
@@ -338,7 +477,10 @@ async def introduce(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📩 Contact for Work:\n"
         "- Discord: LePhiAnhDev\n"
         "- Telegram: @lephianh386ht\n"
-        "- GitHub: https://github.com/LePhiAnhDev"
+        "- GitHub: https://github.com/LePhiAnhDev\n\n"
+        "🌟 DONATE:\n"
+        "💳 1039506134 | LE PHI ANH\n"
+        "Vietcombank - Ngân hàng Ngoại Thương Việt Nam\n\n"
     )
 
 # Lệnh shutdown
@@ -377,7 +519,10 @@ async def screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def download_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text(
-            "Hãy nhập đường dẫn file bạn muốn tải về. Ví dụ: D:/example.format"
+            """
+            Hãy nhập đường dẫn file bạn muốn tải về. Ví dụ:
+            "/downloadfile D:/example.format"
+            """
         )
         return
 
@@ -422,10 +567,59 @@ async def upload_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("Không nhận được file hợp lệ. Vui lòng thử lại!")
 
+async def delete_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Kiểm tra người dùng có nhập đường dẫn file không
+    if not context.args:
+        await update.message.reply_text(
+            """
+            Hãy nhập đường dẫn file bạn muốn xoá. Ví dụ:
+            "/deletefile D:/example.format"
+            """
+        )
+        return
+
+    # Lấy đường dẫn file từ tin nhắn
+    file_path = " ".join(context.args).strip()
+
+    # Kiểm tra file có tồn tại không
+    if os.path.isfile(file_path):
+        try:
+            # Xóa file
+            os.remove(file_path)
+            await update.message.reply_text(f"File tại đường dẫn {file_path} đã được xóa thành công.")
+        except Exception as e:
+            await update.message.reply_text(f"Có lỗi xảy ra khi xóa file: {e}")
+    else:
+        await update.message.reply_text(f"Không tìm thấy file tại đường dẫn: {file_path}")
+
+async def open_web(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Kiểm tra người dùng có nhập lệnh mở web không
+    if not context.args:
+        await update.message.reply_text(
+            """
+            Hãy nhập lệnh mở web. Ví dụ:
+            /openweb chrome.exe "web.format/component"
+            """
+        )
+        return
+
+    # Lấy lệnh từ tin nhắn và xử lý đường dẫn
+    command = " ".join(context.args).strip()
+
+    # Xử lý ký tự đặc biệt trong URL nếu có
+    command = command.replace('“', '"').replace('”', '"').replace('‘', '"').replace('’', '"')
+
+    try:
+        # Thực thi lệnh mở web
+        os.system(command)
+        await update.message.reply_text(f"Đã thực thi lệnh: {command}")
+    except Exception as e:
+        await update.message.reply_text(f"Có lỗi xảy ra khi thực thi lệnh: {e}")
+
 # Khởi chạy bot Telegram
 async def main():
     # Thay bằng token bot của bạn từ BotFather
-    TOKEN = "<Enter the Telegram Bot token>"
+    TOKEN = 'ENTER YOUR BOT TOKEN'
 
     app = ApplicationBuilder().token(TOKEN).build()
 
@@ -444,24 +638,33 @@ async def main():
     app.add_handler(CommandHandler("netuser", netuser))
     app.add_handler(CommandHandler("whoami", whoami))
     app.add_handler(CommandHandler("hostname", hostname))
-    app.add_handler(CallbackQueryHandler(confirm_action, pattern="^confirm$"))
-    app.add_handler(CallbackQueryHandler(cancel_action, pattern="^cancel$"))
     app.add_handler(CommandHandler("menu", menu))
     app.add_handler(CommandHandler("playvideo", play_video))
     app.add_handler(CommandHandler("cancel", cancel))
-    app.add_handler(CallbackQueryHandler(video_controls, pattern="^(play_pause|rewind|forward|change_video|close_all)$"))
+    app.add_handler(CallbackQueryHandler(video_controls, pattern="^(play_pause|rewind|forward|close_all)$"))
     app.add_handler(CommandHandler("customvolume", custom_volume))
     app.add_handler(CallbackQueryHandler(handle_volume_control, pattern="^(decrease_volume|increase_volume)$"))
     app.add_handler(CallbackQueryHandler(handle_brave_controls, pattern="^(close_brave_and_play|cancel_playvideo)$"))
+    app.add_handler(CommandHandler("sleep", sleep))
+    app.add_handler(CallbackQueryHandler(confirm_action, pattern="^confirm$"))
+    app.add_handler(CallbackQueryHandler(cancel_action, pattern="^cancel$"))
+    app.add_handler(CommandHandler("controlmouse", control_mouse))
+    app.add_handler(CallbackQueryHandler(handle_mouse_action, pattern="^(up|down|left|right|left_click|right_click)$"))
+    app.add_handler(CommandHandler("keyboardemulator", keyboard_emulator))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_key_press))
+    app.add_handler(CommandHandler("deletefile", delete_file))
+    app.add_handler(CommandHandler("openweb", open_web))
 
     # Tạo bàn phím gợi ý cho người dùng
     user_keyboard = [
-        ["/shutdown", "/restart", "/cancel"],
-        ["/screenshot", "/uploadfile", "/downloadfile"],
-        ["/tasklist", "/systeminfo", "/ipconfig"],
-        ["/release", "/renew", "/netuser"],
-        ["/whoami", "/hostname", "/menu"],
-        ["/playvideo", "/introduce", "/customvolume"]
+        ["/introduce"],
+        ["/shutdown", "/sleep", "/restart", "/cancel"],
+        ["/screenshot"],
+        ["/uploadfile", "/downloadfile", "/deletefile"],
+        ["/tasklist", "/systeminfo", "/netuser", "/whoami", "/hostname"],
+        ["/ipconfig", "/release", "/renew"],
+        ["/menu", "/playvideo", "/openweb"],
+        ["/customvolume", "/controlmouse", "/keyboardemulator"]
     ]
 
     reply_markup = ReplyKeyboardMarkup(user_keyboard, one_time_keyboard=False, resize_keyboard=True)
