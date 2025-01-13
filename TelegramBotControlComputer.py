@@ -598,7 +598,7 @@ async def open_web(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             """
             Hãy nhập lệnh mở web. Ví dụ:
-            /openweb chrome.exe "web.format/component"
+            /openweb start chrome.exe "web.format/component"
             """
         )
         return
