@@ -471,6 +471,7 @@ async def ask_confirmation(update: Update, context: ContextTypes.DEFAULT_TYPE, a
     await update.message.reply_text(f"Bạn có chắc chắn muốn {action} máy không?", reply_markup=reply_markup)
 
 # Lệnh introduce
+# Do not change developer's personal information
 async def introduce(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "👨‍💻 DEVELOPER | LÊ PHI ANH\n\n"
