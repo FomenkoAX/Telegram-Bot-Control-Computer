@@ -96,10 +96,4 @@ TOKEN = 'ENTER YOUR BOT TOKEN'
 
 ---
 
-## Author
-**Lê Phi Anh**  
 
-## Contact for Work
-- Discord: LePhiAnhDev  
-- Telegram: @lephianh386ht  
-- GitHub: [LePhiAnhDev](https://github.com/LePhiAnhDev)
